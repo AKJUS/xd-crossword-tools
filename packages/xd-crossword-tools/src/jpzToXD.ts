@@ -1,43 +1,170 @@
 import { Clue, CrosswordJSON, Tile } from "xd-crossword-tools-parser"
 import { JSONToXD } from "./JSONtoXD"
-import parse from "xml-parser"
+import { XMLParser } from "fast-xml-parser"
 import { LetterTile } from "xd-crossword-tools-parser"
+
+// -- fast-xml-parser preserveOrder helpers --
+// With preserveOrder: true, each node is an object like:
+//   { tagName: [...children], ":@": { attr1: "val", ... } }
+// Text nodes are: { "#text": "some text" }
+
+type FxpNode = { [key: string]: any }
+
+/** Get the tag name of a node (first key that isn't ":@" or "#text") */
+function nodeName(node: FxpNode): string | undefined {
+  return Object.keys(node).find((k) => k !== ":@" && k !== "#text")
+}
+
+/** Get the children array of a node */
+function nodeChildren(node: FxpNode): FxpNode[] {
+  const name = nodeName(node)
+  return name ? node[name] : []
+}
+
+/** Get an attribute value from a node */
+function attr(node: FxpNode, key: string): string | undefined {
+  return node[":@"]?.[key]
+}
+
+/** Find first child element with the given tag name */
+function findChild(nodes: FxpNode[], name: string): FxpNode | undefined {
+  return nodes.find((n) => nodeName(n) === name)
+}
+
+/** Filter child elements by tag name */
+function filterChildren(nodes: FxpNode[], name: string): FxpNode[] {
+  return nodes.filter((n) => nodeName(n) === name)
+}
+
+/** Get plain text content from a node's children, stripping all tags */
+function textContent(nodes: FxpNode[]): string {
+  let result = ""
+  for (const n of nodes) {
+    if ("#text" in n) {
+      result += n["#text"]
+    } else {
+      result += textContent(nodeChildren(n))
+    }
+  }
+  return result
+}
+
+/**
+ * Converts a fast-xml-parser preserveOrder node tree into xd markup.
+ * Handles <i>/<em>, <b>/<strong>, <u>, <s>/<strike>/<del>, <a href>, and <img>.
+ * Strips an optional wrapping <span> and any unknown tags (keeping their text).
+ */
+function convertNodesToXDMarkup(nodes: FxpNode[]): string {
+  // Unwrap a single outer <span> wrapper
+  if (nodes.length === 1 && nodeName(nodes[0]) === "span") {
+    nodes = nodeChildren(nodes[0])
+  }
+
+  const tagMap: { [tag: string]: { open: string; close: string } } = {
+    i: { open: "{/", close: "/}" },
+    em: { open: "{/", close: "/}" },
+    b: { open: "{*", close: "*}" },
+    strong: { open: "{*", close: "*}" },
+    u: { open: "{_", close: "_}" },
+    s: { open: "{-", close: "-}" },
+    strike: { open: "{-", close: "-}" },
+    del: { open: "{-", close: "-}" },
+    sub: { open: "{~", close: "~}" },
+    sup: { open: "{^", close: "^}" },
+  }
+
+  let result = ""
+  for (const node of nodes) {
+    if ("#text" in node) {
+      result += node["#text"]
+      continue
+    }
+
+    const tag = nodeName(node)
+    if (!tag) continue
+    const children = nodeChildren(node)
+
+    if (tag === "img") {
+      const src = attr(node, "src") ?? ""
+      const alt = attr(node, "alt") ?? ""
+      result += alt ? `{![${src}|${alt}]!}` : `{![${src}]!}`
+    } else if (tag === "a") {
+      const href = attr(node, "href") ?? ""
+      const text = convertNodesToXDMarkup(children)
+      result += `{@${text}|${href}@}`
+    } else if (tag in tagMap) {
+      const { open, close } = tagMap[tag]
+      result += `${open}${convertNodesToXDMarkup(children)}${close}`
+    } else {
+      // Unknown tag — recurse into children, keeping text
+      result += convertNodesToXDMarkup(children)
+    }
+  }
+
+  return result
+}
+
+const fxpParser = new XMLParser({
+  preserveOrder: true,
+  ignoreAttributes: false,
+  attributeNamePrefix: "",
+  processEntities: false,
+  trimValues: false,
+})
 
 /**
  * Takes a jpz xml string and converts it to an xd file.
  */
 export function jpzToXD(xmlString: string): string {
-  const parsed = parse(xmlString)
+  const parsed: FxpNode[] = fxpParser.parse(xmlString)
 
-  const rectangularPuzzle = parsed.root.children.find((child: { name: string }) => child.name === "rectangular-puzzle")
+  // The root is typically <crossword-compiler-applet>
+  const root = parsed.find((n) => nodeName(n) !== undefined && nodeName(n) !== "?xml")
+  if (!root) throw new Error("Could not find root element in JPZ")
+
+  const rootChildren = nodeChildren(root)
+  const rectangularPuzzle = findChild(rootChildren, "rectangular-puzzle")
   if (!rectangularPuzzle) throw new Error("Could not find rectangular-puzzle element in JPZ")
 
-  const metadataEl = rectangularPuzzle.children.find((child: { name: string }) => child.name === "metadata")
+  const rpChildren = nodeChildren(rectangularPuzzle)
+  const metadataEl = findChild(rpChildren, "metadata")
   if (!metadataEl) throw new Error("Could not find metadata element in JPZ")
 
-  const crosswordEl = rectangularPuzzle.children.find((child: { name: string }) => child.name === "crossword")
+  const crosswordEl = findChild(rpChildren, "crossword")
   if (!crosswordEl) throw new Error("Could not find crossword element in JPZ")
 
-  const gridEl = crosswordEl.children.find((child: { name: string }) => child.name === "grid")
+  const cwChildren = nodeChildren(crosswordEl)
+  const gridEl = findChild(cwChildren, "grid")
   if (!gridEl) throw new Error("Could not find grid element in JPZ")
 
-  const cluesEls = crosswordEl.children.filter((child: { name: string }) => child.name === "clues")
+  const cluesEls = filterChildren(cwChildren, "clues")
   if (cluesEls.length !== 2) throw new Error("Expected exactly two clues elements in JPZ")
 
-  const title = metadataEl.children.find((c: { name: string }) => c.name === "title")?.content ?? "Untitled"
+  const metaChildren = nodeChildren(metadataEl)
+  const titleEl = findChild(metaChildren, "title")
+  const title = titleEl ? textContent(nodeChildren(titleEl)).trim() : "Untitled"
 
   // Grabbing metadata from the JPZ file
   const meta: CrosswordJSON["meta"] = {
     title,
-    author: metadataEl.children.find((c: { name: string }) => c.name === "creator")?.content ?? "Unknown Author",
+    author: (() => {
+      const el = findChild(metaChildren, "creator")
+      return el ? textContent(nodeChildren(el)).trim() : "Unknown Author"
+    })(),
     editor: title.includes("edited by") ? title.split("edited by")[1].trim() : "",
-    date: metadataEl.children.find((c: { name: string }) => c.name === "created_at")?.content ?? "",
-    copyright: metadataEl.children.find((c: { name: string }) => c.name === "copyright")?.content ?? "",
+    date: (() => {
+      const el = findChild(metaChildren, "created_at")
+      return el ? textContent(nodeChildren(el)).trim() : ""
+    })(),
+    copyright: (() => {
+      const el = findChild(metaChildren, "copyright")
+      return el ? textContent(nodeChildren(el)).trim() : ""
+    })(),
   }
 
   // Extracting the grid
-  const gridWidth = parseInt(gridEl.attributes.width, 10)
-  const gridHeight = parseInt(gridEl.attributes.height, 10)
+  const gridWidth = parseInt(attr(gridEl, "width")!, 10)
+  const gridHeight = parseInt(attr(gridEl, "height")!, 10)
   const tiles: Tile[][] = Array.from({ length: gridHeight }, () => Array(gridWidth).fill({ type: "blank" }))
   const numberPositions: { [num: string]: { row: number; col: number } } = {}
 
@@ -45,47 +172,48 @@ export function jpzToXD(xmlString: string): string {
   const cellBars: { [key: string]: { left?: boolean; top?: boolean } } = {}
   let hasAnyBars = false
 
-  for (const cell of gridEl.children) {
-    if (cell.name !== "cell") continue
-    const x = parseInt(cell.attributes.x, 10) - 1 // 1-based to 0-based
-    const y = parseInt(cell.attributes.y, 10) - 1 // 1-based to 0-based
+  const gridChildren = nodeChildren(gridEl)
+  for (const cell of filterChildren(gridChildren, "cell")) {
+    const x = parseInt(attr(cell, "x")!, 10) - 1 // 1-based to 0-based
+    const y = parseInt(attr(cell, "y")!, 10) - 1 // 1-based to 0-based
 
-    if (cell.attributes.type === "block") {
+    if (attr(cell, "type") === "block") {
       tiles[y][x] = { type: "blank" }
     } else {
       // Check if there are any definitions for bars
       const barAttributes = ["left-bar", "right-bar", "top-bar", "bottom-bar"]
-      if (barAttributes.some((attr) => cell.attributes[attr] === "true")) meta.form = "barred"
+      if (barAttributes.some((a) => attr(cell, a) === "true")) meta.form = "barred"
 
       const tile: LetterTile = {
         type: "letter",
-        letter: cell.attributes.solution ?? "?", // Use '?' if solution missing
+        letter: attr(cell, "solution") ?? "?", // Use '?' if solution missing
       }
 
-      if (cell.attributes.number) {
-        numberPositions[cell.attributes.number] = { row: y, col: x }
+      const num = attr(cell, "number")
+      if (num) {
+        numberPositions[num] = { row: y, col: x }
       }
 
       // Collect bar information for this cell
       const bars: { left?: boolean; top?: boolean } = {}
-      if (cell.attributes["left-bar"] === "true") {
+      if (attr(cell, "left-bar") === "true") {
         bars.left = true
         hasAnyBars = true
       }
-      if (cell.attributes["top-bar"] === "true") {
+      if (attr(cell, "top-bar") === "true") {
         bars.top = true
         hasAnyBars = true
       }
 
       // Note: right-bar and bottom-bar are converted to left-bar and top-bar on adjacent cells
       // For the XD format, we need to store them on the adjacent cells
-      if (cell.attributes["right-bar"] === "true" && x < gridWidth - 1) {
+      if (attr(cell, "right-bar") === "true" && x < gridWidth - 1) {
         const key = `${y},${x + 1}`
         if (!cellBars[key]) cellBars[key] = {}
         cellBars[key].left = true
         hasAnyBars = true
       }
-      if (cell.attributes["bottom-bar"] === "true" && y < gridHeight - 1) {
+      if (attr(cell, "bottom-bar") === "true" && y < gridHeight - 1) {
         const key = `${y + 1},${x}`
         if (!cellBars[key]) cellBars[key] = {}
         cellBars[key].top = true
@@ -105,17 +233,17 @@ export function jpzToXD(xmlString: string): string {
   }
 
   // Extract word definitions to get answers
-  const wordEls = crosswordEl.children.filter((child: { name: string }) => child.name === "word")
+  const wordEls = filterChildren(cwChildren, "word")
   const wordAnswers: { [wordId: string]: string } = {}
 
   for (const wordEl of wordEls) {
-    const wordID = wordEl.attributes.id
-    const cellsEls = wordEl.children.filter((child: { name: string }) => child.name === "cells")
+    const wordID = attr(wordEl, "id")!
+    const cellsEls = filterChildren(nodeChildren(wordEl), "cells")
     let answer = ""
 
     for (const cellEl of cellsEls) {
-      const x = parseInt(cellEl.attributes.x, 10) - 1
-      const y = parseInt(cellEl.attributes.y, 10) - 1
+      const x = parseInt(attr(cellEl, "x")!, 10) - 1
+      const y = parseInt(attr(cellEl, "y")!, 10) - 1
       const tile = tiles[y][x]
       if (tile.type === "letter") {
         answer += tile.letter
@@ -129,32 +257,28 @@ export function jpzToXD(xmlString: string): string {
   const clues: CrosswordJSON["clues"] = { across: [], down: [] }
 
   for (const cluesEl of cluesEls) {
-    const titleEl = cluesEl.children.find((c: { name: string }) => c.name === "title")
-    const direction = (titleEl?.children?.length || 0) > 0 ? titleEl?.children[0]?.content?.toLowerCase() : titleEl?.content?.toLowerCase()
+    const cluesChildren = nodeChildren(cluesEl)
+    const titleNode = findChild(cluesChildren, "title")
+    const titleChildren = titleNode ? nodeChildren(titleNode) : []
+    const direction = textContent(titleChildren).toLowerCase().trim()
 
     if (!direction || (direction !== "across" && direction !== "down")) continue
 
-    for (const clueEl of cluesEl.children) {
-      if (clueEl.name !== "clue") continue
+    for (const clueEl of filterChildren(cluesChildren, "clue")) {
+      const num = attr(clueEl, "number")!
+      const wordID = attr(clueEl, "word")!
+      const clueChildren = nodeChildren(clueEl)
 
-      const num = clueEl.attributes.number
-      let text = ""
+      // Convert the clue's child nodes (which may contain mixed content
+      // like <i>, <b>, etc.) directly to xd markup
+      const text = convertNodesToXDMarkup(clueChildren).trim()
 
-      // Sometimes, the clue text is wrapped in a span element
-      if (clueEl.children.length > 0) {
-        const textEl = clueEl.children.find((c: { name: string }) => c.name === "span")
-        text = textEl?.content ?? ""
-      } else {
-        // Sometimes its not
-        text = clueEl.content ?? ""
-      }
       const pos = numberPositions[num]
       if (!pos) {
         console.warn(`Could not find position for clue number ${num}`)
         continue
       }
 
-      const wordID = clueEl.attributes.word
       const answer = wordAnswers[wordID] || ""
 
       // Skip clues without valid answers

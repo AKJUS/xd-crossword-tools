@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<crossword-compiler-applet>
+  <rectangular-puzzle>
+    <metadata>
+      <creator>Nick Henriquez</creator>
+      <title>NH sample puzzle</title>
+    </metadata>
+    <crossword>
+      <grid one-letter-words="false" height="7" width="7">
+        <grid-look numbering-scheme="normal" />
+        <cell x="1" y="1" number="1" solution="H" />
+        <cell x="2" y="1" number="2" solution="U" />
+        <cell x="3" y="1" number="3" solution="R" />
+        <cell x="4" y="1" number="4" solution="L" />
+        <cell x="5" y="1" type="block" />
+        <cell x="6" y="1" type="block" />
+        <cell x="7" y="1" type="block" />
+        <cell x="1" y="2" number="5" solution="A" />
+        <cell x="2" y="2" solution="T" />
+        <cell x="3" y="2" solution="E" />
+        <cell x="4" y="2" solution="A" />
+        <cell x="5" y="2" number="6" solution="M" />
+        <cell x="6" y="2" type="block" />
+        <cell x="7" y="2" type="block" />
+        <cell x="1" y="3" number="7" solution="H" />
+        <cell x="2" y="3" solution="I" />
+        <cell x="3" y="3" solution="N" />
+        <cell x="4" y="3" solution="T" />
+        <cell x="5" y="3" solution="E" />
+        <cell x="6" y="3" number="8" solution="D" />
+        <cell x="7" y="3" type="block" />
+        <cell x="1" y="4" number="9" solution="A" />
+        <cell x="2" y="4" solution="L" />
+        <cell x="3" y="4" solution="T" />
+        <cell x="4" y="4" solution="E" />
+        <cell x="5" y="4" solution="R" />
+        <cell x="6" y="4" solution="E" />
+        <cell x="7" y="4" number="10" solution="D" />
+        <cell x="1" y="5" type="block" />
+        <cell x="2" y="5" number="11" solution="E" />
+        <cell x="3" y="5" solution="E" />
+        <cell x="4" y="5" solution="R" />
+        <cell x="5" y="5" solution="I" />
+        <cell x="6" y="5" solution="L" />
+        <cell x="7" y="5" solution="Y" />
+        <cell x="1" y="6" type="block" />
+        <cell x="2" y="6" type="block" />
+        <cell x="3" y="6" number="12" solution="D" />
+        <cell x="4" y="6" solution="A" />
+        <cell x="5" y="6" solution="N" />
+        <cell x="6" y="6" solution="T" />
+        <cell x="7" y="6" solution="E" />
+        <cell x="1" y="7" type="block" />
+        <cell x="2" y="7" type="block" />
+        <cell x="3" y="7" type="block" />
+        <cell x="4" y="7" number="13" solution="L" />
+        <cell x="5" y="7" solution="O" />
+        <cell x="6" y="7" solution="A" />
+        <cell x="7" y="7" solution="D" />
+      </grid>
+      <word id="1">
+        <cells x="1" y="1" />
+        <cells x="2" y="1" />
+        <cells x="3" y="1" />
+        <cells x="4" y="1" />
+      </word>
+      <word id="2">
+        <cells x="1" y="2" />
+        <cells x="2" y="2" />
+        <cells x="3" y="2" />
+        <cells x="4" y="2" />
+        <cells x="5" y="2" />
+      </word>
+      <word id="3">
+        <cells x="1" y="3" />
+        <cells x="2" y="3" />
+        <cells x="3" y="3" />
+        <cells x="4" y="3" />
+        <cells x="5" y="3" />
+        <cells x="6" y="3" />
+      </word>
+      <word id="4">
+        <cells x="1" y="4" />
+        <cells x="2" y="4" />
+        <cells x="3" y="4" />
+        <cells x="4" y="4" />
+        <cells x="5" y="4" />
+        <cells x="6" y="4" />
+        <cells x="7" y="4" />
+      </word>
+      <word id="5">
+        <cells x="2" y="5" />
+        <cells x="3" y="5" />
+        <cells x="4" y="5" />
+        <cells x="5" y="5" />
+        <cells x="6" y="5" />
+        <cells x="7" y="5" />
+      </word>
+      <word id="6">
+        <cells x="3" y="6" />
+        <cells x="4" y="6" />
+        <cells x="5" y="6" />
+        <cells x="6" y="6" />
+        <cells x="7" y="6" />
+      </word>
+      <word id="7">
+        <cells x="4" y="7" />
+        <cells x="5" y="7" />
+        <cells x="6" y="7" />
+        <cells x="7" y="7" />
+      </word>
+      <word id="8">
+        <cells x="1" y="1" />
+        <cells x="1" y="2" />
+        <cells x="1" y="3" />
+        <cells x="1" y="4" />
+      </word>
+      <word id="9">
+        <cells x="2" y="1" />
+        <cells x="2" y="2" />
+        <cells x="2" y="3" />
+        <cells x="2" y="4" />
+        <cells x="2" y="5" />
+      </word>
+      <word id="10">
+        <cells x="3" y="1" />
+        <cells x="3" y="2" />
+        <cells x="3" y="3" />
+        <cells x="3" y="4" />
+        <cells x="3" y="5" />
+        <cells x="3" y="6" />
+      </word>
+      <word id="11">
+        <cells x="4" y="1" />
+        <cells x="4" y="2" />
+        <cells x="4" y="3" />
+        <cells x="4" y="4" />
+        <cells x="4" y="5" />
+        <cells x="4" y="6" />
+        <cells x="4" y="7" />
+      </word>
+      <word id="12">
+        <cells x="5" y="2" />
+        <cells x="5" y="3" />
+        <cells x="5" y="4" />
+        <cells x="5" y="5" />
+        <cells x="5" y="6" />
+        <cells x="5" y="7" />
+      </word>
+      <word id="13">
+        <cells x="6" y="3" />
+        <cells x="6" y="4" />
+        <cells x="6" y="5" />
+        <cells x="6" y="6" />
+        <cells x="6" y="7" />
+      </word>
+      <word id="14">
+        <cells x="7" y="4" />
+        <cells x="7" y="5" />
+        <cells x="7" y="6" />
+        <cells x="7" y="7" />
+      </word>
+      <clues>
+        <title>
+          <b>Across</b>
+        </title>
+        <clue number="1" word="1">
+          <span>Throw</span>
+        </clue>
+        <clue number="5" word="2">
+          <span>Starters</span>
+        </clue>
+        <clue number="7" word="3">
+          <span>Got (at)</span>
+        </clue>
+        <clue number="9" word="4">
+          <span>"___ States" (Ken Russell thriller)</span>
+        </clue>
+        <clue number="11" word="5">
+          <span>In a creepy way</span>
+        </clue>
+        <clue number="12" word="6">
+          <span>Writer of the <i>Divina Commedia</i></span>
+        </clue>
+        <clue number="13" word="7">
+          <span>Washing machine unit</span>
+        </clue>
+      </clues>
+      <clues>
+        <title>
+          <b>Down</b>
+        </title>
+        <clue number="1" word="8">
+          <span>Alternative to 😂</span>
+        </clue>
+        <clue number="2" word="9">
+          <span>Of use</span>
+        </clue>
+        <clue number="3" word="10">
+          <span>Didn't own</span>
+        </clue>
+        <clue number="4" word="11">
+          <span>Pass thrown by a receiver</span>
+        </clue>
+        <clue number="6" word="12">
+          <span>Type of wool</span>
+        </clue>
+        <clue number="8" word="13">
+          <span>World's largest airline, by revenue</span>
+        </clue>
+        <clue number="10" word="14">
+          <span>Like blue hair</span>
+        </clue>
+      </clues>
+    </crossword>
+  </rectangular-puzzle>
+</crossword-compiler-applet>
+

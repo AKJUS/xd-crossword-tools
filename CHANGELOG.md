@@ -1,5 +1,9 @@
 This isn't a comprehensive doc because to our knowledge there are no OSS consumers of this lib, but for posterities sake here are the breaking changes:
 
+### 13.1.0
+
+- Switched the xml parsing library from xml-parser to fast-xml-parser. It may claim to be faster, but it can handle more complicated XML setups. This is mostly useful for the jpz -> xd clue parsing which should cover more cases now
+
 ### 13.0.0
 
 - All formatting types (bold, italics, strike, underscore, subscript, superscript, link, color) now have a required `children` field containing parsed inner components. This enables nested markup like `{*{/bold italic/}*}` or `{*bold {/and italic/} text*}`.
