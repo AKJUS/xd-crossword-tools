@@ -5,6 +5,7 @@ import { describe, it, expect } from "vitest"
 const simpleJpz = readFileSync(__dirname + "/jpz/That's a Bear in a Bee Costume.jpz", "utf8")
 const complexJpz = readFileSync(__dirname + "/jpz/lil-167-ratliff-121823.jpz", "utf8")
 const jpzBarredContent = readFileSync(__dirname + "/jpz/Printer-Devilry-kyle-dolan.jpz", "utf-8")
+const inlineStyleJpz = readFileSync(__dirname + "/jpz/inline-style-sample.jpz", "utf8")
 
 describe(jpzToXD.name, () => {
   it("should parse a simple jpz file", () => {
@@ -235,5 +236,88 @@ describe(jpzToXD.name, () => {
       A.A.A...
       "
     `)
+  })
+
+  it("converts inline style tags inside clues to xd markup", () => {
+    const res = jpzToXD(inlineStyleJpz)
+    // The italicized title in clue A12 should round-trip into xd italic markup.
+    expect(res).toContain("A12. Writer of the {/Divina Commedia/} ~ DANTE")
+    expect(res).toMatchInlineSnapshot(`
+      "## Metadata
+
+      title: NH sample puzzle
+      author: Nick Henriquez
+      editor: 
+      date: 
+      copyright: 
+
+      ## Grid
+
+      HURL...
+      ATEAM..
+      HINTED.
+      ALTERED
+      .EERILY
+      ..DANTE
+      ...LOAD
+
+      ## Clues
+
+      A1. Throw ~ HURL
+      A5. Starters ~ ATEAM
+      A7. Got (at) ~ HINTED
+      A9. "___ States" (Ken Russell thriller) ~ ALTERED
+      A11. In a creepy way ~ EERILY
+      A12. Writer of the {/Divina Commedia/} ~ DANTE
+      A13. Washing machine unit ~ LOAD
+
+      D1. Alternative to 😂 ~ HAHA
+      D2. Of use ~ UTILE
+      D3. Didn't own ~ RENTED
+      D4. Pass thrown by a receiver ~ LATERAL
+      D6. Type of wool ~ MERINO
+      D8. World's largest airline, by revenue ~ DELTA
+      D10. Like blue hair ~ DYED"
+    `)
+  })
+
+  it("converts a variety of inline style tags inside clues to xd markup", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<crossword-compiler-applet>
+  <rectangular-puzzle>
+    <metadata>
+      <creator>Test</creator>
+      <title>Inline tag fixture</title>
+    </metadata>
+    <crossword>
+      <grid width="2" height="2">
+        <cell x="1" y="1" number="1" solution="A" />
+        <cell x="2" y="1" solution="B" />
+        <cell x="1" y="2" number="2" solution="C" />
+        <cell x="2" y="2" solution="D" />
+      </grid>
+      <word id="1"><cells x="1" y="1" /><cells x="2" y="1" /></word>
+      <word id="2"><cells x="1" y="2" /><cells x="2" y="2" /></word>
+      <word id="3"><cells x="1" y="1" /><cells x="1" y="2" /></word>
+      <word id="4"><cells x="2" y="1" /><cells x="2" y="2" /></word>
+      <clues>
+        <title><b>Across</b></title>
+        <clue number="1" word="1"><span>Bold <b>thing</b> here</span></clue>
+        <clue number="2" word="2"><span>Strike <s>that</s> out</span></clue>
+      </clues>
+      <clues>
+        <title><b>Down</b></title>
+        <clue number="1" word="3"><span>Underline <u>this</u> word</span></clue>
+        <clue number="2" word="4"><span>Visit <a href="https://example.com">our site</a> now</span></clue>
+      </clues>
+    </crossword>
+  </rectangular-puzzle>
+</crossword-compiler-applet>`
+
+    const res = jpzToXD(xml)
+    expect(res).toContain("A1. Bold {*thing*} here ~ AB")
+    expect(res).toContain("A2. Strike {-that-} out ~ CD")
+    expect(res).toContain("D1. Underline {_this_} word ~ AC")
+    expect(res).toContain("D2. Visit {@our site|https://example.com@} now ~ BD")
   })
 })

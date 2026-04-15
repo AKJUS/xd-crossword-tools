@@ -4,10 +4,99 @@ import parse from "xml-parser"
 import { LetterTile } from "xd-crossword-tools-parser"
 
 /**
+ * Extracts the raw inner XML of every <clue> element, keyed by its `word`
+ * attribute. The xml-parser library used elsewhere in this file does not
+ * preserve mixed content (text after child tags is dropped), so for clues
+ * with inline markup like <i>...</i> we have to read the original XML.
+ */
+function extractRawClueInnerXML(xmlString: string): { [wordId: string]: string } {
+  const map: { [wordId: string]: string } = {}
+  const clueRegex = /<clue\b([^>]*)>([\s\S]*?)<\/clue>/g
+  let m: RegExpExecArray | null
+  while ((m = clueRegex.exec(xmlString)) !== null) {
+    const attrs = m[1]
+    const inner = m[2]
+    const wordMatch = attrs.match(/\bword\s*=\s*["']([^"']*)["']/)
+    if (wordMatch) map[wordMatch[1]] = inner
+  }
+  return map
+}
+
+/**
+ * Converts JPZ-style inline HTML markup inside a clue body to xd markup.
+ * Supports <i>/<em>, <b>/<strong>, <u>, <s>/<strike>/<del>, <a href>, and <img>.
+ * Strips an optional wrapping <span> and any unknown tags (keeping their text).
+ */
+function convertInlineXMLToXDMarkup(xml: string): string {
+  let result = xml.trim()
+
+  // Strip a single outer <span>...</span> wrapper if present
+  const spanMatch = result.match(/^<span\b[^>]*>([\s\S]*)<\/span>\s*$/)
+  if (spanMatch) result = spanMatch[1].trim()
+
+  // <img src alt /> → {![src|alt]!}
+  result = result.replace(/<img\b([^>]*?)\/?>(?:\s*<\/img>)?/g, (_match, attrs) => {
+    const srcMatch = attrs.match(/\bsrc\s*=\s*["']([^"']*)["']/)
+    const altMatch = attrs.match(/\balt\s*=\s*["']([^"']*)["']/)
+    const src = srcMatch ? srcMatch[1] : ""
+    const alt = altMatch ? altMatch[1] : ""
+    return alt ? `{![${src}|${alt}]!}` : `{![${src}]!}`
+  })
+
+  const conversions: Array<{ tags: string[]; open: string; close: string }> = [
+    { tags: ["i", "em"], open: "{/", close: "/}" },
+    { tags: ["b", "strong"], open: "{*", close: "*}" },
+    { tags: ["u"], open: "{_", close: "_}" },
+    { tags: ["s", "strike", "del"], open: "{-", close: "-}" },
+  ]
+
+  // Convert paired inline tags. Repeat until stable so nested tags collapse
+  // innermost-first (after the inner tag is replaced with xd markup it no
+  // longer contains "<", so the outer regex matches).
+  let prev: string
+  do {
+    prev = result
+    for (const { tags, open, close } of conversions) {
+      const re = new RegExp(`<(${tags.join("|")})\\b[^>]*>([^<]*?)</\\1>`, "g")
+      result = result.replace(re, (_m, _tag, content) => `${open}${content}${close}`)
+    }
+    // <a href="URL">TEXT</a> → {@TEXT|URL@}
+    result = result.replace(/<a\b([^>]*)>([^<]*?)<\/a>/g, (_m, attrs, text) => {
+      const hrefMatch = attrs.match(/\bhref\s*=\s*["']([^"']*)["']/)
+      const href = hrefMatch ? hrefMatch[1] : ""
+      return `{@${text}|${href}@}`
+    })
+  } while (result !== prev)
+
+  // Drop any remaining unknown tags but preserve their text content.
+  result = result.replace(/<\/?[^>]+>/g, "")
+
+  return result
+}
+
+/**
+ * Replaces the body of every `<clue>` element with a flat `<span>` containing
+ * just its text content, stripping inline child tags like `<i>` or `<b>`.
+ *
+ * The xml-parser library used here cannot handle mixed content (it loses any
+ * text that appears after a child tag), and a broken parse cascades — sibling
+ * `<clues>` elements then go missing too. Pre-flattening clue bodies keeps the
+ * surrounding structure parseable. The original XML is still inspected via
+ * `extractRawClueInnerXML` to recover the inline markup.
+ */
+function preprocessClueBodiesForParser(xml: string): string {
+  return xml.replace(/(<clue\b[^>]*>)([\s\S]*?)(<\/clue>)/g, (_match, open: string, inner: string, close: string) => {
+    const flattened = inner.replace(/<[^>]+>/g, "")
+    return `${open}<span>${flattened}</span>${close}`
+  })
+}
+
+/**
  * Takes a jpz xml string and converts it to an xd file.
  */
 export function jpzToXD(xmlString: string): string {
-  const parsed = parse(xmlString)
+  const rawClueInnerByWordId = extractRawClueInnerXML(xmlString)
+  const parsed = parse(preprocessClueBodiesForParser(xmlString))
 
   const rectangularPuzzle = parsed.root.children.find((child: { name: string }) => child.name === "rectangular-puzzle")
   if (!rectangularPuzzle) throw new Error("Could not find rectangular-puzzle element in JPZ")
@@ -138,14 +227,20 @@ export function jpzToXD(xmlString: string): string {
       if (clueEl.name !== "clue") continue
 
       const num = clueEl.attributes.number
+      const wordID = clueEl.attributes.word
       let text = ""
 
-      // Sometimes, the clue text is wrapped in a span element
-      if (clueEl.children.length > 0) {
+      // Prefer the raw inner XML so inline markup (e.g. <i>...</i>) is
+      // preserved — xml-parser drops mixed content after the first child tag.
+      const rawInner = wordID ? rawClueInnerByWordId[wordID] : undefined
+      if (rawInner !== undefined) {
+        text = convertInlineXMLToXDMarkup(rawInner)
+      } else if (clueEl.children.length > 0) {
+        // Fallback: sometimes the clue text is wrapped in a span element
         const textEl = clueEl.children.find((c: { name: string }) => c.name === "span")
         text = textEl?.content ?? ""
       } else {
-        // Sometimes its not
+        // Fallback: sometimes its not
         text = clueEl.content ?? ""
       }
       const pos = numberPositions[num]
@@ -154,7 +249,6 @@ export function jpzToXD(xmlString: string): string {
         continue
       }
 
-      const wordID = clueEl.attributes.word
       const answer = wordAnswers[wordID] || ""
 
       // Skip clues without valid answers
