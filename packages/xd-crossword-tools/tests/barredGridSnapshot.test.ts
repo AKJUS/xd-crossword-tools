@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest"
 import { readFileSync } from "fs"
-import parse from "xml-parser"
+import { XMLParser } from "fast-xml-parser"
 
 import { xdToJSON } from "xd-crossword-tools-parser/src"
 import { printBarredGrid, addBarsToTiles } from "../src/printBarredGrid"
 import { BarPosition } from "../src/printBarredGrid"
 import { jpzToXD } from "../src/jpzToXD"
+
+const fxpParser = new XMLParser({ preserveOrder: true, ignoreAttributes: false, attributeNamePrefix: "" })
 
 describe("barred grid snapshot", () => {
   it("should convert JPZ to JSON and visualize with bars", () => {
@@ -77,29 +79,31 @@ describe("barred grid snapshot", () => {
 
     const xdJSON = xdToJSON(parsed)
 
-    // Extract bars from JPZ directly
-    const jpzParsed = parse(jpzContent)
-    const rectangularPuzzle = jpzParsed.root.children.find((child: { name: string }) => child.name === "rectangular-puzzle")
-    const crosswordEl = rectangularPuzzle!.children.find((child: { name: string }) => child.name === "crossword")
-    const gridEl = crosswordEl!.children.find((child: { name: string }) => child.name === "grid")!
+    // Extract bars from JPZ directly using fast-xml-parser
+    const jpzParsed = fxpParser.parse(jpzContent) as any[]
+    const root = jpzParsed.find((n: any) => "crossword-compiler-applet" in n)!
+    const rpNode = root["crossword-compiler-applet"].find((n: any) => "rectangular-puzzle" in n)!
+    const cwNode = rpNode["rectangular-puzzle"].find((n: any) => "crossword" in n)!
+    const gridNode = cwNode["crossword"].find((n: any) => "grid" in n)!
 
     const bars: BarPosition[] = []
-    const gridWidth = parseInt(gridEl.attributes.width, 10)
-    const gridHeight = parseInt(gridEl.attributes.height, 10)
+    const gridWidth = parseInt(gridNode[":@"].width, 10)
+    const gridHeight = parseInt(gridNode[":@"].height, 10)
 
-    for (const cell of gridEl.children) {
-      if (cell.name !== "cell") continue
-      const x = parseInt(cell.attributes.x, 10) - 1
-      const y = parseInt(cell.attributes.y, 10) - 1
+    for (const child of gridNode["grid"]) {
+      if (!("cell" in child)) continue
+      const a = child[":@"]
+      const x = parseInt(a.x, 10) - 1
+      const y = parseInt(a.y, 10) - 1
 
-      if (cell.attributes["left-bar"] === "true") bars.push({ row: y, col: x, type: "left" })
-      if (cell.attributes["top-bar"] === "true") bars.push({ row: y, col: x, type: "top" })
+      if (a["left-bar"] === "true") bars.push({ row: y, col: x, type: "left" })
+      if (a["top-bar"] === "true") bars.push({ row: y, col: x, type: "top" })
 
       // Convert right-bar and bottom-bar to left-bar and top-bar on adjacent cells
-      if (cell.attributes["right-bar"] === "true" && x < gridWidth - 1) {
+      if (a["right-bar"] === "true" && x < gridWidth - 1) {
         bars.push({ row: y, col: x + 1, type: "left" })
       }
-      if (cell.attributes["bottom-bar"] === "true" && y < gridHeight - 1) {
+      if (a["bottom-bar"] === "true" && y < gridHeight - 1) {
         bars.push({ row: y + 1, col: x, type: "top" })
       }
     }

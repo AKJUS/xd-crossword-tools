@@ -303,7 +303,7 @@ describe(jpzToXD.name, () => {
       <clues>
         <title><b>Across</b></title>
         <clue number="1" word="1"><span>Bold <b>thing</b> here</span></clue>
-        <clue number="2" word="2"><span>Strike <s>that</s> out</span></clue>
+        <clue number="2" word="2"><span>H<sub>2</sub>O is <sup>super</sup> cool <s>not</s> out</span></clue>
       </clues>
       <clues>
         <title><b>Down</b></title>
@@ -316,8 +316,59 @@ describe(jpzToXD.name, () => {
 
     const res = jpzToXD(xml)
     expect(res).toContain("A1. Bold {*thing*} here ~ AB")
-    expect(res).toContain("A2. Strike {-that-} out ~ CD")
+    expect(res).toContain("A2. H{~2~}O is {^super^} cool {-not-} out ~ CD")
     expect(res).toContain("D1. Underline {_this_} word ~ AC")
     expect(res).toContain("D2. Visit {@our site|https://example.com@} now ~ BD")
+  })
+
+  it("converts nested inline tags to nested xd markup", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<crossword-compiler-applet>
+  <rectangular-puzzle>
+    <metadata>
+      <creator>Test</creator>
+      <title>Nested tag fixture</title>
+    </metadata>
+    <crossword>
+      <grid width="3" height="3">
+        <cell x="1" y="1" number="1" solution="A" />
+        <cell x="2" y="1" solution="B" />
+        <cell x="3" y="1" solution="C" />
+        <cell x="1" y="2" number="2" solution="D" />
+        <cell x="2" y="2" solution="E" />
+        <cell x="3" y="2" solution="F" />
+        <cell x="1" y="3" number="3" solution="G" />
+        <cell x="2" y="3" solution="H" />
+        <cell x="3" y="3" solution="I" />
+      </grid>
+      <word id="1"><cells x="1" y="1" /><cells x="2" y="1" /><cells x="3" y="1" /></word>
+      <word id="2"><cells x="1" y="2" /><cells x="2" y="2" /><cells x="3" y="2" /></word>
+      <word id="3"><cells x="1" y="3" /><cells x="2" y="3" /><cells x="3" y="3" /></word>
+      <word id="4"><cells x="1" y="1" /><cells x="1" y="2" /><cells x="1" y="3" /></word>
+      <word id="5"><cells x="2" y="1" /><cells x="2" y="2" /><cells x="2" y="3" /></word>
+      <word id="6"><cells x="3" y="1" /><cells x="3" y="2" /><cells x="3" y="3" /></word>
+      <clues>
+        <title><b>Across</b></title>
+        <clue number="1" word="1"><span>A <b><i>bold italic</i></b> phrase</span></clue>
+        <clue number="2" word="2"><span>Click <a href="https://example.com"><b>bold link</b></a> here</span></clue>
+        <clue number="3" word="3"><span>Some <u><i>underscored italic</i></u> text</span></clue>
+      </clues>
+      <clues>
+        <title><b>Down</b></title>
+        <clue number="1" word="4"><span>A <b>bold with <i>nested italic</i> inside</b> end</span></clue>
+        <clue number="2" word="5"><span>See <i>the <b>deep</b> nesting</i> here</span></clue>
+        <clue number="3" word="6"><span>Plain clue</span></clue>
+      </clues>
+    </crossword>
+  </rectangular-puzzle>
+</crossword-compiler-applet>`
+
+    const res = jpzToXD(xml)
+    expect(res).toContain("A1. A {*{/bold italic/}*} phrase ~ ABC")
+    expect(res).toContain("A2. Click {@{*bold link*}|https://example.com@} here ~ DEF")
+    expect(res).toContain("A3. Some {_{/underscored italic/}_} text ~ GHI")
+    expect(res).toContain("D1. A {*bold with {/nested italic/} inside*} end ~ ADG")
+    expect(res).toContain("D2. See {/the {*deep*} nesting/} here ~ BEH")
+    expect(res).toContain("D3. Plain clue ~ CFI")
   })
 })

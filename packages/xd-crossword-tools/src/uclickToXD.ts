@@ -2,12 +2,17 @@
 // Which does not actually work, this code would need to be changed to better
 // handle formatting
 //
-import parse from "xml-parser"
+import { XMLParser } from "fast-xml-parser"
+
+const fxpParser = new XMLParser({ preserveOrder: true, ignoreAttributes: false, attributeNamePrefix: "" })
 
 export const uclickXMLToXD = (str: string) => {
-  const parsed = parse(str)
-  const crossword = parsed.root.children.find((child: { name: string }) => child.name === "crossword")
-  if (!crossword) throw new Error("Could not find crossword element in XML")
+  const parsed = fxpParser.parse(str) as any[]
+  const root = parsed.find((n: any) => Object.keys(n).some((k) => k !== ":@" && k !== "#text"))!
+  const rootKey = Object.keys(root).find((k) => k !== ":@" && k !== "#text")!
+  const rootChildren: any[] = root[rootKey]
+  const crosswordNode = rootChildren.find((n: any) => "crossword" in n)
+  if (!crosswordNode) throw new Error("Could not find crossword element in XML")
 
   let width = -1
   let metaRaw: Record<string, string> = {}
@@ -15,33 +20,41 @@ export const uclickXMLToXD = (str: string) => {
   const downs: string[] = []
   const acrosses: string[] = []
 
+  const cwChildren: any[] = crosswordNode["crossword"]
+
   // Process all elements
-  crossword.children.forEach((element: any) => {
-    if (element.name === "Width") {
-      width = Number(element.attributes.v)
-    } else if (element.name === "AllAnswer") {
-      answer = element.attributes.v.replace(/-/g, ".")
-    } else if (element.name === "across") {
-      element.children.forEach((clue: any) => {
-        if (clue.name.startsWith("a")) {
-          const i = clue.name.slice(1)
-          const answer = clue.attributes.a
-          const c = decodeURIComponent(clue.attributes.c)
-          acrosses.push(`${i}. ${c} ~ ${answer}`)
-        }
+  cwChildren.forEach((element: any) => {
+    const name = Object.keys(element).find((k) => k !== ":@" && k !== "#text")
+    if (!name) return
+    const attrs = element[":@"] || {}
+
+    if (name === "Width") {
+      width = Number(attrs.v)
+    } else if (name === "AllAnswer") {
+      answer = attrs.v.replace(/-/g, ".")
+    } else if (name === "across") {
+      ;(element[name] as any[]).forEach((clue: any) => {
+        const clueName = Object.keys(clue).find((k) => k !== ":@" && k !== "#text")
+        if (!clueName || !clueName.startsWith("a")) return
+        const clueAttrs = clue[":@"] || {}
+        const i = clueName.slice(1)
+        const answer = clueAttrs.a
+        const c = decodeURIComponent(clueAttrs.c)
+        acrosses.push(`${i}. ${c} ~ ${answer}`)
       })
-    } else if (element.name === "down") {
-      element.children.forEach((clue: any) => {
-        if (clue.name.startsWith("d")) {
-          const i = clue.name.slice(1)
-          const answer = clue.attributes.a
-          const c = decodeURIComponent(clue.attributes.c)
-          downs.push(`${i}. ${c} ~ ${answer}`)
-        }
+    } else if (name === "down") {
+      ;(element[name] as any[]).forEach((clue: any) => {
+        const clueName = Object.keys(clue).find((k) => k !== ":@" && k !== "#text")
+        if (!clueName || !clueName.startsWith("d")) return
+        const clueAttrs = clue[":@"] || {}
+        const i = clueName.slice(1)
+        const answer = clueAttrs.a
+        const c = decodeURIComponent(clueAttrs.c)
+        downs.push(`${i}. ${c} ~ ${answer}`)
       })
     } else {
       // Handle metadata
-      metaRaw[element.name] = element.attributes.v
+      metaRaw[name] = attrs.v
     }
   })
 
